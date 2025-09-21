@@ -1,0 +1,287 @@
+@startuml Webmail Client Class Diagram
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam packageStyle rectangle
+
+package "Core Types" {
+  class Email {
+    +id: string
+    +sender: Sender
+    +subject: string
+    +preview: string
+    +timestamp: Date
+    +isRead: boolean
+    +isStarred: boolean
+    +hasAttachment: boolean
+    +isImportant: boolean
+  }
+  
+  class Sender {
+    +name: string
+    +email: string
+    +avatar?: string
+  }
+  
+  class SidebarItem {
+    +id: string
+    +label: string
+    +icon: LucideIcon
+    +count: number
+  }
+  
+  class FilterCriteria {
+    +sender: string
+    +dateRange: string
+    +customDate: Date | null
+    +readStatus: string
+    +hasAttachment: string
+  }
+}
+
+package "Main Components" {
+  class DashboardLayout {
+    -activeSection: string
+    -selectedEmails: string[]
+    -selectedEmail: Email | null
+    -emails: Email[]
+    -showFilters: boolean
+    -showCompose: boolean
+    -composeMode: "compose" | "reply" | "forward"
+    -composeEmail: Email | null
+    -showDeleteModal: boolean
+    +handleEmailSelect(emailId: string): void
+    +handleSelectAll(checked: boolean): void
+    +handleEmailClick(email: Email): void
+    +handleCompose(): void
+    +handleReply(): void
+    +handleForward(): void
+    +handleDeleteEmail(): void
+    +handleBulkDelete(): void
+    +handleBulkArchive(): void
+    +handleBulkStar(): void
+    +handleApplyFilters(filters: FilterCriteria): void
+    +handleDeleteAll(): void
+    +handleDeleteRead(): void
+    +handleDeleteUnread(): void
+    +handleDeleteSelected(emailIds: string[]): void
+    +handleDeleteByDateRange(emailIds: string[]): void
+  }
+  
+  class EmailList {
+    -hoveredEmail: string | null
+    +emails: Email[]
+    +selectedEmails: string[]
+    +onEmailSelect: (emailId: string) => void
+    +onEmailClick: (email: Email) => void
+    +onSelectAll: (checked: boolean) => void
+    +render(): JSX.Element
+  }
+  
+  class EmailView {
+    -isStarred: boolean
+    +email: Email
+    +onBack: () => void
+    +onReply: () => void
+    +onForward: () => void
+    +onDelete: () => void
+    +toggleStar(): void
+    +render(): JSX.Element
+  }
+  
+  class ComposeModal {
+    -to: string
+    -cc: string
+    -bcc: string
+    -subject: string
+    -content: string
+    -attachments: File[]
+    -showCc: boolean
+    -showBcc: boolean
+    +isOpen: boolean
+    +onClose: () => void
+    +replyTo?: Email
+    +forwardEmail?: Email
+    +handleSend(): void
+    +handleAttachment(file: File): void
+    +render(): JSX.Element
+  }
+  
+  class DeleteModal {
+    -deleteOption: string
+    -customSelectedEmails: string[]
+    -startDate: string
+    -endDate: string
+    +isOpen: boolean
+    +onClose: () => void
+    +emails: Email[]
+    +selectedEmails: string[]
+    +onDeleteAll: () => void
+    +onDeleteRead: () => void
+    +onDeleteUnread: () => void
+    +onDeleteSelected: (emailIds: string[]) => void
+    +onDeleteByDateRange?: (emailIds: string[]) => void
+    +getEmailsByDateRange(): Email[]
+    +handleDelete(): void
+    +getDeleteCount(): number
+    +handleCustomEmailToggle(emailId: string): void
+  }
+}
+
+package "Utility Components" {
+  class BulkActionsToolbar {
+    -showConfirmDialog: boolean
+    +selectedCount: number
+    +onBulkDelete: () => void
+    +onBulkArchive: () => void
+    +onBulkStar: () => void
+    +onClearSelection: () => void
+    +render(): JSX.Element
+  }
+  
+  class BulkDeleteFilters {
+    -filters: FilterCriteria
+    -showCalendar: boolean
+    +onApplyFilters: (filters: FilterCriteria) => void
+    +handleApplyFilters(): void
+    +handleClearFilters(): void
+    +render(): JSX.Element
+  }
+  
+  class LandingPage {
+    +render(): JSX.Element
+  }
+  
+  class LoginPage {
+    -isLoading: string | null
+    +handleLogin(provider: string): Promise<void>
+    +render(): JSX.Element
+  }
+}
+
+package "UI Components" {
+  class Button {
+    +variant: string
+    +size: string
+    +onClick: () => void
+    +disabled?: boolean
+    +children: React.ReactNode
+  }
+  
+  class Input {
+    +type: string
+    +value: string
+    +onChange: (e: Event) => void
+    +placeholder?: string
+    +className?: string
+  }
+  
+  class Checkbox {
+    +checked: boolean
+    +onCheckedChange: (checked: boolean) => void
+    +className?: string
+  }
+  
+  class Dialog {
+    +open: boolean
+    +onOpenChange: (open: boolean) => void
+    +children: React.ReactNode
+  }
+  
+  class DialogContent {
+    +className?: string
+    +children: React.ReactNode
+  }
+  
+  class DropdownMenu {
+    +children: React.ReactNode
+  }
+  
+  class Avatar {
+    +className?: string
+    +children: React.ReactNode
+  }
+  
+  class Badge {
+    +variant?: string
+    +className?: string
+    +children: React.ReactNode
+  }
+}
+
+package "Hooks" {
+  class useToast {
+    +toast: (options: ToastOptions) => void
+  }
+  
+  class useMobile {
+    +isMobile: boolean
+  }
+}
+
+' Relationships
+Email ||--|| Sender : contains
+DashboardLayout ||--o{ Email : manages
+DashboardLayout ||--|| EmailList : renders
+DashboardLayout ||--|| EmailView : renders
+DashboardLayout ||--|| ComposeModal : renders
+DashboardLayout ||--|| DeleteModal : renders
+DashboardLayout ||--|| BulkActionsToolbar : renders
+DashboardLayout ||--|| BulkDeleteFilters : renders
+
+EmailList ||--o{ Email : displays
+EmailView ||--|| Email : displays
+ComposeModal ||--o| Email : references
+DeleteModal ||--o{ Email : processes
+
+BulkDeleteFilters ||--|| FilterCriteria : uses
+DashboardLayout ||--o{ SidebarItem : contains
+
+' UI Component relationships
+EmailList ||--o{ Checkbox : uses
+EmailList ||--o{ Avatar : uses
+EmailList ||--o{ Badge : uses
+EmailList ||--o{ Button : uses
+
+EmailView ||--o{ Button : uses
+EmailView ||--o{ Avatar : uses
+EmailView ||--o{ DropdownMenu : uses
+
+ComposeModal ||--|| Dialog : extends
+ComposeModal ||--o{ Input : uses
+ComposeModal ||--o{ Button : uses
+
+DeleteModal ||--|| Dialog : extends
+DeleteModal ||--o{ Checkbox : uses
+DeleteModal ||--o{ Input : uses
+DeleteModal ||--o{ Button : uses
+
+BulkActionsToolbar ||--o{ Button : uses
+BulkActionsToolbar ||--|| DropdownMenu : uses
+
+BulkDeleteFilters ||--o{ Input : uses
+BulkDeleteFilters ||--o{ Button : uses
+
+' Hook usage
+ComposeModal ..> useToast : uses
+BulkActionsToolbar ..> useToast : uses
+
+note top of DashboardLayout
+  Main container component that manages
+  the entire email application state
+  and coordinates between child components
+end note
+
+note top of Email
+  Core data structure representing
+  an email message with all its
+  properties and metadata
+end note
+
+note top of DeleteModal
+  Advanced deletion modal with multiple
+  deletion options including date range,
+  read status, and custom selection
+end note
+
+@enduml
