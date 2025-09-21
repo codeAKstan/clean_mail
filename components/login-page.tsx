@@ -1,20 +1,44 @@
 "use client"
 
 import { useState } from "react"
+import { signIn, getSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Chrome, Zap } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export function LoginPage() {
   const [isLoading, setIsLoading] = useState<string | null>(null)
+  const router = useRouter()
 
   const handleLogin = async (provider: string) => {
-    setIsLoading(provider)
-    // Simulate OAuth login process
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    if (provider !== "gmail") {
+      // For now, only Gmail is implemented
+      return
+    }
 
-    // For demo purposes, redirect to dashboard
-    window.location.href = "/dashboard"
+    setIsLoading(provider)
+    
+    try {
+      const result = await signIn("google", {
+        callbackUrl: "/dashboard",
+        redirect: false,
+      })
+
+      if (result?.ok) {
+        // Check if we have a valid session
+        const session = await getSession()
+        if (session) {
+          router.push("/dashboard")
+        }
+      } else {
+        console.error("Login failed:", result?.error)
+      }
+    } catch (error) {
+      console.error("Login error:", error)
+    } finally {
+      setIsLoading(null)
+    }
   }
 
   return (
@@ -58,28 +82,26 @@ export function LoginPage() {
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-12 text-left justify-start gap-3 hover:bg-secondary bg-transparent"
-              onClick={() => handleLogin("outlook")}
-              disabled={isLoading !== null}
+              className="w-full h-12 text-left justify-start gap-3 hover:bg-secondary bg-transparent opacity-50 cursor-not-allowed"
+              disabled={true}
             >
               <div className="w-5 h-5 bg-blue-600 rounded flex items-center justify-center">
                 <Mail className="w-3 h-3 text-white" />
               </div>
-              {isLoading === "outlook" ? "Connecting..." : "Continue with Outlook"}
+              Continue with Outlook (Coming Soon)
             </Button>
 
             {/* Yahoo Login */}
             <Button
               variant="outline"
               size="lg"
-              className="w-full h-12 text-left justify-start gap-3 hover:bg-secondary bg-transparent"
-              onClick={() => handleLogin("yahoo")}
-              disabled={isLoading !== null}
+              className="w-full h-12 text-left justify-start gap-3 hover:bg-secondary bg-transparent opacity-50 cursor-not-allowed"
+              disabled={true}
             >
               <div className="w-5 h-5 bg-purple-600 rounded flex items-center justify-center">
                 <Mail className="w-3 h-3 text-white" />
               </div>
-              {isLoading === "yahoo" ? "Connecting..." : "Continue with Yahoo"}
+              Continue with Yahoo (Coming Soon)
             </Button>
           </CardContent>
         </Card>

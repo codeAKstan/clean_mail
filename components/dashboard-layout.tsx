@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -12,13 +13,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Mail, Send, FileText, Trash2, Settings, Search, Plus, LogOut, User, Filter } from "lucide-react"
+import { Mail, Send, FileText, Trash2, Settings, Search, Plus, LogOut, User, Filter, Loader2 } from "lucide-react"
 import { EmailList } from "@/components/email-list"
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar"
 import { BulkDeleteFilters } from "@/components/bulk-delete-filters"
 import { EmailView } from "@/components/email-view"
 import { ComposeModal } from "@/components/compose-modal"
 import { DeleteModal } from "@/components/delete-modal"
+import { GmailService, GmailEmail } from "@/lib/gmail"
+import { useRouter } from "next/navigation"
 
 const mockEmails = [
   {
@@ -250,33 +253,78 @@ const mockEmails = [
 ]
 
 export function DashboardLayout() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [activeSection, setActiveSection] = useState("inbox")
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [selectedEmail, setSelectedEmail] = useState<any>(null)
-  const [emails, setEmails] = useState(mockEmails)
+  const [emails, setEmails] = useState<GmailEmail[]>([])
   const [showFilters, setShowFilters] = useState(false)
   const [showCompose, setShowCompose] = useState(false)
   const [composeMode, setComposeMode] = useState<"compose" | "reply" | "forward">("compose")
   const [composeEmail, setComposeEmail] = useState<any>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [gmailService, setGmailService] = useState<GmailService | null>(null)
 
   const sidebarItems = [
-    { id: "inbox", label: "Inbox", icon: Mail, count: 12 },
+    { id: "inbox", label: "Inbox", icon: Mail, count: emails.filter(e => !e.isRead).length },
     { id: "sent", label: "Sent", icon: Send, count: 0 },
-    { id: "drafts", label: "Drafts", icon: FileText, count: 3 },
+    { id: "drafts", label: "Drafts", icon: FileText, count: 0 },
     { id: "trash", label: "Trash", icon: Trash2, count: 0 },
   ]
+
+  // Initialize Gmail service and fetch emails
+  useEffect(() => {
+    const initializeGmail = async () => {
+      if (status === "loading") return
+      
+      if (!session?.accessToken) {
+        router.push("/login")
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const service = new GmailService(session.accessToken)
+        setGmailService(service)
+        
+        const fetchedEmails = await service.getEmails()
+        setEmails(fetchedEmails)
+      } catch (err) {
+        console.error("Failed to initialize Gmail:", err)
+        setError("Failed to load emails. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeGmail()
+  }, [session, status, router])
+
+  // Handle logout
+  const handleLogout = async () => {
+    await signOut({ callbackUrl: "/login" })
+  }
 
   const handleEmailSelect = (emailId: string) => {
     setSelectedEmails((prev) => (prev.includes(emailId) ? prev.filter((id) => id !== emailId) : [...prev, emailId]))
   }
 
   const handleSelectAll = (checked: boolean) => {
-    setSelectedEmails(checked ? mockEmails.map((email) => email.id) : [])
+    setSelectedEmails(checked ? emails.map((email) => email.id) : [])
   }
 
   const handleEmailClick = (email: any) => {
     setSelectedEmail(email)
+    // Mark email as read if it's not already read
+    if (!email.isRead && gmailService) {
+      gmailService.markAsRead(email.id).catch(console.error)
+      setEmails(prev => prev.map(e => e.id === email.id ? { ...e, isRead: true } : e))
+    }
   }
 
   const handleCompose = () => {
@@ -297,29 +345,58 @@ export function DashboardLayout() {
     setShowCompose(true)
   }
 
-  const handleDeleteEmail = () => {
-    if (selectedEmail) {
-      setEmails((prev) => prev.filter((email) => email.id !== selectedEmail.id))
-      setSelectedEmail(null)
+  const handleDeleteEmail = async () => {
+    if (selectedEmail && gmailService) {
+      try {
+        await gmailService.deleteEmail(selectedEmail.id)
+        setEmails((prev) => prev.filter((email) => email.id !== selectedEmail.id))
+        setSelectedEmail(null)
+      } catch (error) {
+        console.error("Failed to delete email:", error)
+        setError("Failed to delete email. Please try again.")
+      }
     }
   }
 
-  const handleBulkDelete = () => {
-    setEmails((prev) => prev.filter((email) => !selectedEmails.includes(email.id)))
-    setSelectedEmails([])
+  const handleBulkDelete = async () => {
+    if (gmailService && selectedEmails.length > 0) {
+      try {
+        await Promise.all(selectedEmails.map(id => gmailService.deleteEmail(id)))
+        setEmails((prev) => prev.filter((email) => !selectedEmails.includes(email.id)))
+        setSelectedEmails([])
+      } catch (error) {
+        console.error("Failed to delete emails:", error)
+        setError("Failed to delete emails. Please try again.")
+      }
+    }
   }
 
-  const handleBulkArchive = () => {
-    // In a real app, this would move emails to archive
-    setEmails((prev) => prev.filter((email) => !selectedEmails.includes(email.id)))
-    setSelectedEmails([])
+  const handleBulkArchive = async () => {
+    if (gmailService && selectedEmails.length > 0) {
+      try {
+        await Promise.all(selectedEmails.map(id => gmailService.archiveEmail(id)))
+        setEmails((prev) => prev.filter((email) => !selectedEmails.includes(email.id)))
+        setSelectedEmails([])
+      } catch (error) {
+        console.error("Failed to archive emails:", error)
+        setError("Failed to archive emails. Please try again.")
+      }
+    }
   }
 
-  const handleBulkStar = () => {
-    setEmails((prev) =>
-      prev.map((email) => (selectedEmails.includes(email.id) ? { ...email, isStarred: true } : email)),
-    )
-    setSelectedEmails([])
+  const handleBulkStar = async () => {
+    if (gmailService && selectedEmails.length > 0) {
+      try {
+        await Promise.all(selectedEmails.map(id => gmailService.starEmail(id)))
+        setEmails((prev) =>
+          prev.map((email) => (selectedEmails.includes(email.id) ? { ...email, isStarred: true } : email)),
+        )
+        setSelectedEmails([])
+      } catch (error) {
+        console.error("Failed to star emails:", error)
+        setError("Failed to star emails. Please try again.")
+      }
+    }
   }
 
   const handleApplyFilters = (filters: any) => {
@@ -327,14 +404,17 @@ export function DashboardLayout() {
     console.log("Applying filters:", filters)
     // For demo, we'll just show a subset based on sender filter
     if (filters.sender) {
-      const filtered = mockEmails.filter(
+      const filtered = emails.filter(
         (email) =>
           email.sender.name.toLowerCase().includes(filters.sender.toLowerCase()) ||
           email.sender.email.toLowerCase().includes(filters.sender.toLowerCase()),
       )
       setEmails(filtered)
     } else {
-      setEmails(mockEmails)
+      // Refresh emails from Gmail
+      if (gmailService) {
+        gmailService.getEmails().then(setEmails).catch(console.error)
+      }
     }
   }
 
@@ -461,7 +541,7 @@ export function DashboardLayout() {
             <DropdownMenuContent className="w-56" align="end" forceMount>
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-1 leading-none">
-                  <p className="font-medium">john.doe@gmail.com</p>
+                  <p className="font-medium">{session?.user?.email || "Loading..."}</p>
                   <p className="w-[200px] truncate text-sm text-muted-foreground">Connected via Gmail</p>
                 </div>
               </div>
@@ -475,7 +555,7 @@ export function DashboardLayout() {
                 <span>Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Log out</span>
               </DropdownMenuItem>
@@ -486,7 +566,33 @@ export function DashboardLayout() {
         {/* Content Area */}
         <main className="flex-1 p-6">
           <div className="h-full bg-card rounded-lg border border-border overflow-hidden flex flex-col">
-            {selectedEmail ? (
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+                  <p className="text-muted-foreground">Loading your emails...</p>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center space-y-4">
+                  <div className="w-12 h-12 mx-auto bg-destructive/10 rounded-full flex items-center justify-center">
+                    <Mail className="w-6 h-6 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-destructive">Error loading emails</p>
+                    <p className="text-sm text-muted-foreground mt-1">{error}</p>
+                  </div>
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    variant="outline"
+                    size="sm"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            ) : selectedEmail ? (
               <EmailView
                 email={selectedEmail}
                 onBack={() => setSelectedEmail(null)}
