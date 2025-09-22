@@ -28,17 +28,23 @@ export class GmailService {
   }
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+    console.log(`Making Gmail API request to: ${endpoint}`)
+    
+    const response = await fetch(`https://gmail.googleapis.com/gmail/v1${endpoint}`, {
       ...options,
       headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
+        Authorization: `Bearer ${this.accessToken}`,
         'Content-Type': 'application/json',
         ...options.headers,
       },
     })
 
+    console.log(`Gmail API response status: ${response.status} ${response.statusText}`)
+
     if (!response.ok) {
-      throw new Error(`Gmail API error: ${response.status} ${response.statusText}`)
+      const errorText = await response.text()
+      console.error(`Gmail API error details:`, errorText)
+      throw new Error(`Gmail API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
     return response.json()

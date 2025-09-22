@@ -278,10 +278,23 @@ export function DashboardLayout() {
   // Initialize Gmail service and fetch emails
   useEffect(() => {
     const initializeGmail = async () => {
+      console.log("Initializing Gmail - Status:", status, "Session:", session)
+      
       if (status === "loading") return
       
       if (!session?.accessToken) {
+        console.log("No access token found, redirecting to login")
         router.push("/login")
+        return
+      }
+
+      console.log("Access token found:", session.accessToken ? "Yes" : "No")
+      console.log("Session error:", session.error)
+
+      // Check for token refresh errors
+      if (session.error === "RefreshAccessTokenError") {
+        console.error("Token refresh failed, redirecting to login")
+        await signOut({ callbackUrl: "/login" })
         return
       }
 
@@ -289,13 +302,22 @@ export function DashboardLayout() {
         setLoading(true)
         setError(null)
         
+        console.log("Creating Gmail service with token:", session.accessToken.substring(0, 20) + "...")
         const service = new GmailService(session.accessToken)
         setGmailService(service)
         
+        console.log("Fetching emails...")
         const fetchedEmails = await service.getEmails()
+        console.log("Fetched emails count:", fetchedEmails.length)
         setEmails(fetchedEmails)
       } catch (err) {
         console.error("Failed to initialize Gmail:", err)
+        // Check if it's an authentication error
+        if (err instanceof Error && err.message.includes("401")) {
+          console.error("Authentication failed, redirecting to login")
+          await signOut({ callbackUrl: "/login" })
+          return
+        }
         setError("Failed to load emails. Please try again.")
       } finally {
         setLoading(false)
