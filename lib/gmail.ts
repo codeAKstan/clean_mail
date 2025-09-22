@@ -52,25 +52,44 @@ export class GmailService {
 
   async getEmails(maxResults: number = 50, query?: string): Promise<GmailEmail[]> {
     try {
+      console.log(`Fetching emails with maxResults: ${maxResults}, query: ${query || 'in:inbox'}`)
+      
       const response = await this.makeRequest(
         `/users/me/messages?maxResults=${maxResults}&q=${encodeURIComponent(query || 'in:inbox')}`
       )
 
+      console.log('Gmail messages list response:', response)
+
       if (!response.messages) {
+        console.log('No messages found in response')
         return []
       }
 
+      console.log(`Found ${response.messages.length} messages, fetching details...`)
+
       const emails = await Promise.all(
-        response.messages.map(async (message: any) => {
-          const emailData = await this.makeRequest(`/users/me/messages/${message.id}?format=full`)
-          return this.parseEmailData(emailData)
+        response.messages.map(async (message: any, index: number) => {
+          try {
+            console.log(`Fetching email ${index + 1}/${response.messages.length}: ${message.id}`)
+            const emailData = await this.makeRequest(`/users/me/messages/${message.id}?format=full`)
+            const parsedEmail = this.parseEmailData(emailData)
+            console.log(`Successfully parsed email ${index + 1}: ${parsedEmail.subject}`)
+            return parsedEmail
+          } catch (error) {
+            console.error(`Error fetching email ${message.id}:`, error)
+            throw error
+          }
         })
       )
 
+      console.log(`Successfully fetched ${emails.length} emails`)
       return emails
     } catch (error) {
-      console.error('Error fetching emails:', error)
-      throw new Error('Failed to fetch emails')
+      console.error('Error in getEmails:', error)
+      if (error instanceof Error) {
+        throw new Error(`Failed to fetch emails: ${error.message}`)
+      }
+      throw new Error('Failed to fetch emails: Unknown error')
     }
   }
 
