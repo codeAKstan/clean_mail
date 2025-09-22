@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useSession, signOut } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -13,7 +14,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Mail, Send, FileText, Trash2, Settings, Search, Plus, LogOut, User, Filter, Loader2 } from "lucide-react"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Mail,
+  Send,
+  FileText,
+  Trash2,
+  Settings,
+  Search,
+  Plus,
+  LogOut,
+  User,
+  Filter,
+  Loader2,
+  Menu,
+  ArrowLeft,
+} from "lucide-react"
 import { EmailList } from "@/components/email-list"
 import { BulkActionsToolbar } from "@/components/bulk-actions-toolbar"
 import { BulkDeleteFilters } from "@/components/bulk-delete-filters"
@@ -21,7 +37,7 @@ import { EmailView } from "@/components/email-view"
 import { ComposeModal } from "@/components/compose-modal"
 import { DeleteModal } from "@/components/delete-modal"
 import { GmailService, GmailEmail } from "@/lib/gmail"
-import { useRouter } from "next/navigation"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 const mockEmails = [
   {
@@ -255,6 +271,7 @@ const mockEmails = [
 export function DashboardLayout() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [activeSection, setActiveSection] = useState("inbox")
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
   const [selectedEmail, setSelectedEmail] = useState<any>(null)
@@ -267,6 +284,7 @@ export function DashboardLayout() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [gmailService, setGmailService] = useState<GmailService | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const sidebarItems = [
     { id: "inbox", label: "Inbox", icon: Mail, count: emails.filter(e => !e.isRead).length },
@@ -472,75 +490,168 @@ export function DashboardLayout() {
 
   return (
     <div className="h-screen bg-background flex">
-      {/* Sidebar */}
-      <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-        {/* Header */}
-        <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Mail className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <h1 className="font-semibold text-sidebar-foreground">Clean Webmail</h1>
-          </div>
-        </div>
+      {/* Mobile Sidebar */}
+      {isMobile ? (
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="w-64 p-0">
+            <div className="h-full bg-sidebar border-r border-sidebar-border flex flex-col">
+              {/* Header */}
+              <div className="p-4 border-b border-sidebar-border">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                    <Mail className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <h1 className="font-semibold text-sidebar-foreground">Clean Webmail</h1>
+                </div>
+              </div>
 
-        {/* Compose Button */}
-        <div className="p-4">
-          <Button className="w-full justify-start gap-2" size="lg" onClick={handleCompose}>
-            <Plus className="w-4 h-4" />
-            Compose
-          </Button>
-        </div>
+              {/* Compose Button */}
+              <div className="p-4">
+                <Button 
+                  className="w-full justify-start gap-2" 
+                  size="lg" 
+                  onClick={() => {
+                    handleCompose()
+                    setSidebarOpen(false)
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                  Compose
+                </Button>
+              </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-2">
-          <ul className="space-y-1">
-            {sidebarItems.map((item) => (
-              <li key={item.id}>
+              {/* Navigation */}
+              <nav className="flex-1 px-2">
+                <ul className="space-y-1">
+                  {sidebarItems.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        onClick={() => {
+                          setActiveSection(item.id)
+                          setSidebarOpen(false)
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                          activeSection === item.id
+                            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                            : "text-sidebar-foreground hover:bg-sidebar-accent/10"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon className="w-4 h-4" />
+                          <span>{item.label}</span>
+                        </div>
+                        {item.count > 0 && (
+                          <Badge variant="secondary" className="text-xs">
+                            {item.count}
+                          </Badge>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+
+              {/* Settings */}
+              <div className="p-2 border-t border-sidebar-border">
                 <button
-                  onClick={() => setActiveSection(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                    activeSection === item.id
+                  onClick={() => {
+                    setActiveSection("settings")
+                    setSidebarOpen(false)
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                    activeSection === "settings"
                       ? "bg-sidebar-primary text-sidebar-primary-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-accent/10"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-4 h-4" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.count > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {item.count}
-                    </Badge>
-                  )}
+                  <Settings className="w-4 h-4" />
+                  <span>Settings</span>
                 </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        /* Desktop Sidebar */
+        <div className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+          {/* Header */}
+          <div className="p-4 border-b border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <Mail className="w-4 h-4 text-primary-foreground" />
+              </div>
+              <h1 className="font-semibold text-sidebar-foreground">Clean Webmail</h1>
+            </div>
+          </div>
 
-        {/* Settings */}
-        <div className="p-2 border-t border-sidebar-border">
-          <button
-            onClick={() => setActiveSection("settings")}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-              activeSection === "settings"
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/10"
-            }`}
-          >
-            <Settings className="w-4 h-4" />
-            <span>Settings</span>
-          </button>
+          {/* Compose Button */}
+          <div className="p-4">
+            <Button className="w-full justify-start gap-2" size="lg" onClick={handleCompose}>
+              <Plus className="w-4 h-4" />
+              Compose
+            </Button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-2">
+            <ul className="space-y-1">
+              {sidebarItems.map((item) => (
+                <li key={item.id}>
+                  <button
+                    onClick={() => setActiveSection(item.id)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
+                      activeSection === item.id
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/10"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </div>
+                    {item.count > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {item.count}
+                      </Badge>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* Settings */}
+          <div className="p-2 border-t border-sidebar-border">
+            <button
+              onClick={() => setActiveSection("settings")}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                activeSection === "settings"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/10"
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Top Bar */}
         <header className="h-16 border-b border-border bg-background px-6 flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
+            {isMobile && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(true)}
+                className="p-2"
+              >
+                <Menu className="w-4 h-4" />
+              </Button>
+            )}
             {/* Search */}
             <div className="relative max-w-md flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -615,38 +726,57 @@ export function DashboardLayout() {
                 </div>
               </div>
             ) : selectedEmail ? (
-              <EmailView
-                email={selectedEmail}
-                onBack={() => setSelectedEmail(null)}
-                onReply={handleReply}
-                onForward={handleForward}
-                onDelete={handleDeleteEmail}
-              />
+              <div className="flex-1 flex flex-col">
+                {isMobile && (
+                  <div className="p-4 border-b border-border">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedEmail(null)}
+                      className="gap-2"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      Back to inbox
+                    </Button>
+                  </div>
+                )}
+                <EmailView
+                  email={selectedEmail}
+                  onBack={() => setSelectedEmail(null)}
+                  onReply={handleReply}
+                  onForward={handleForward}
+                  onDelete={handleDeleteEmail}
+                />
+              </div>
             ) : (
               <>
                 <div className="flex items-center justify-between p-6 border-b border-border">
                   <h2 className="text-2xl font-semibold capitalize text-card-foreground">{activeSection}</h2>
                   {activeSection === "inbox" && (
                     <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowFilters(!showFilters)}
-                        className="gap-2"
-                      >
-                        <Filter className="w-4 h-4" />
-                        Filters
-                      </Button>
-                      {emails.length > 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowDeleteModal(true)}
-                          className="gap-2 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Bulk Delete
-                        </Button>
+                      {!isMobile && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowFilters(!showFilters)}
+                            className="gap-2"
+                          >
+                            <Filter className="w-4 h-4" />
+                            Filters
+                          </Button>
+                          {emails.length > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowDeleteModal(true)}
+                              className="gap-2 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                              Bulk Delete
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
