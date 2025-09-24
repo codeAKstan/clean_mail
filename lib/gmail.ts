@@ -47,7 +47,18 @@ export class GmailService {
       throw new Error(`Gmail API error: ${response.status} ${response.statusText} - ${errorText}`)
     }
 
-    return response.json()
+    // Handle empty responses (like DELETE operations)
+    const responseText = await response.text()
+    if (!responseText || responseText.trim() === '') {
+      return null
+    }
+
+    try {
+      return JSON.parse(responseText)
+    } catch (error) {
+      console.error('Failed to parse JSON response:', responseText)
+      throw new Error('Invalid JSON response from Gmail API')
+    }
   }
 
   async getEmails(maxResults: number = 50, query?: string): Promise<GmailEmail[]> {
